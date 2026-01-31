@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Holy Bible Reader & Quiz</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#8b7500">
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body{font-family:system-ui;background:#f2f2f2;margin:0}
+body.dark{background:#121212;color:#eee}
+header{background:darkgoldenrod;color:#fff;padding:14px;text-align:center}
+section{padding:10px;text-align:center}
+#reader,#quizBox{background:#fff;max-width:720px;margin:10px auto;padding:12px;border-radius:6px}
+.qOptions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.qOption{background:#f7f7f7;padding:8px 12px;border-radius:6px;cursor:pointer}
+.qOption input{margin-right:6px}
+.correct{background:#c8f7c5;border:2px solid #2ecc71}
+.wrong{background:#f7c5c5;border:2px solid #e74c3c}
+footer{background:#222;color:#ccc;padding:10px;text-align:center}
+#dailyVerse{color:gold}
+#timer{font-weight:bold;color:#b00}
+select{max-width:240px;margin:6px auto}
+</style>
+
+<style>
+.lang-wrapper{
+  max-width:220px;
+  margin:8px auto 0 auto;
+}
+
+</style>
+</head>
+
+<body>
+
+<!--<header>
+  <h3>📖 Holy Bible Reader & Quiz</h3>
+</header>-->
+
+
+<header>
+  <h3 id="title">📖 Holy Bible Reader & Quiz</h3>
+
+  <!-- 🌍 LANGUAGE SELECTOR (VISIBLE & CENTERED) -->
+  <div class="lang-wrapper">
+    <select id="langSelect" class="form-select">
+      <option value="en">English</option>
+      <option value="fr">Français</option>
+      <option value="yo">Yorùbá</option>
+    </select>
+  </div>
+</header>
+
+<section>
+  <input id="book" placeholder="Book (e.g. Genesis)">
+  <input id="chapter" type="number" placeholder="Chapter">
+  <button id="searchBtn">Read</button>
+
+  <div id="reader">Search a Bible chapter…</div>
+
+  <!-- 🎙 VOICE SELECTOR -->
+  <select id="voiceSelect" class="form-select">
+    <option>Loading voices…</option>
+  </select>
+
+  <button id="ttsBtn">🔊 Read Aloud</button>
+  <button id="stopBtn">⏹ Stop</button>
+  <button id="musicBtn">🎵 Worship</button>
+  <button id="nightBtn">🌙 Night</button>
+</section>
+
+<section id="quizBox">
+  <div id="qText" class="fw-bold mb-2"></div>
+  <div id="timer"></div>
+  <div id="qOptions" class="qOptions"></div>
+  <button id="qNext" class="mt-2">▶ Start Quiz</button>
+  <button id="restartBtn" style="display:none">🔁 Restart</button>
+  <div id="qScore" class="mt-2 fw-bold"></div>
+</section>
+
+<footer>
+  <div id="dailyVerse"></div>
+  <small style="font-size: 1.5em;">© 2026 Evangelist Engineer. <span style="color:gold;">Stephen Jolayemi</span>. All right reserved</small>
+</footer>
+
+<script>
+/* ===== AUDIO ===== */
+const correctSound=new Audio("correct.mp3");
+const wrongSound=new Audio("wrong.mp3");
+const music=new Audio("worship.mp3"); music.loop=true;
+
+let audioUnlocked=false;
+function unlockAudio(){
+ if(audioUnlocked) return;
+ correctSound.play().then(()=>correctSound.pause()).catch(()=>{});
+ wrongSound.play().then(()=>wrongSound.pause()).catch(()=>{});
+ audioUnlocked=true;
+}
+document.addEventListener("pointerup",unlockAudio,{once:true});
+
+/* ===== HELPERS ===== */
+const $=id=>document.getElementById(id);
+
+/* ===== VOICE SELECTOR ===== */
+let voices=[];
+function loadVoices(){
+ voices=speechSynthesis.getVoices();
+ $("voiceSelect").innerHTML="";
+ voices.forEach((v,i)=>{
+  const opt=document.createElement("option");
+  opt.value=i;
+  opt.textContent=`${v.name} (${v.lang})`;
+  $("voiceSelect").appendChild(opt);
+ });
+}
+speechSynthesis.onvoiceschanged=loadVoices;
+
+/* ===== BIBLE ===== */
+$("searchBtn").addEventListener("pointerup",()=>{
+ fetch(`https://bible-api.com/${book.value} ${chapter.value||1}`)
+ .then(r=>r.json())
+ .then(d=>reader.innerText=d.text||"❌ Not found")
+ .catch(()=>reader.innerText="❌ Not found");
+});
+
+/* ===== TTS ===== */
+$("ttsBtn").addEventListener("pointerup",()=>{
+ unlockAudio();
+ speechSynthesis.cancel();
+ const u=new SpeechSynthesisUtterance(reader.innerText);
+ const v=voices[$("voiceSelect").value];
+ if(v) u.voice=v;
+ speechSynthesis.speak(u);
+});
+$("stopBtn").addEventListener("pointerup",()=>speechSynthesis.cancel());
+
+/* ===== UI ===== */
+$("musicBtn").addEventListener("pointerup",()=>music.paused?music.play():music.pause());
+$("nightBtn").addEventListener("pointerup",()=>document.body.classList.toggle("dark"));
+
+/* ===== DAILY VERSE ===== */
+const verses=[
+"Psalm 23:1 – The Lord is my shepherd",
+"John 3:16 – For God so loved the world",
+"Philippians 4:13 – I can do all things",
+"Joshua 1:9 – Be strong and courageous"
+];
+const key="verse-"+new Date().toDateString();
+if(!localStorage[key]) localStorage[key]=verses[Math.floor(Math.random()*verses.length)];
+$("dailyVerse").innerText=localStorage[key];
+
+/* ===== QUIZ ===== */
+const quiz=[
+{q:"Who built the ark to survive the great flood?",o:["Moses","Noah","David","Paul"],a:"Noah"},
+{q:"Who was the mother of Jesus Christ?",o:["Mary","Ruth","Esther","Martha"],a:"Mary"},
+{q:"Who led Israel out of Egypt?",o:["Moses","Joshua","Aaron"],a:"Moses"},
+{q:"Who walked on water?",o:["Jesus","Peter","Moses"],a:"Jesus"},
+{q:"Strongest man?",o:["Samson","David","Saul"],a:"Samson"},
+{q:"Who was Noah's grandfather?",o:["Methuselah","Lamech","Enoch","Jared"],a:"Methuselah"},
+{q:"What sign did God give after the flood?",o:["Fire","Rainbow","Cloud","Dove"],a:"Rainbow"},
+{q:"How many sons did Jacob have?",o:["10","11","12","13"],answer:"12"},
+{q:"Who sold Joseph into slavery?",o:["Egyptians","Midianites","Philistines","Moabites"],a:"Midianites"},
+{q:"Who was Moses' brother?",o:["Joshua","Aaron","Caleb","Hur"],answer:"Aaron"},
+{q:"How long did the Israelites wander in the wilderness?",o:["20 years","30 years","40 years","50 years"],a:"40 years"},
+{q:"On which mountain did Moses receive the Ten Commandments?",o:["Mount Horeb","Mount Sinai","Mount Carmel","Mount Nebo"],a:"Mount Sinai"},
+{q:"What was the first plague of Egypt?",o:["Frogs","Darkness","Water turned to blood","Locusts"],a:"Water turned to blood"},
+{q:"Who succeeded Moses as leader of Israel?",o:["Aaron","Joshua","Caleb","Samuel"],a:"Joshua"},
+{q:"How many spies were sent to explore Canaan?",o:["10","11","12","13"],a:"12"},
+{q:"Who announced Jesus’ birth to Mary?",o:["Michael","Gabriel","Raphael","Uriel"],a:"Gabriel"},
+{q:"Who baptized Jesus?",o:["Peter","John the Baptist","James","Andrew"],a:"John the Baptist"},
+{q:"How many days did Jesus fast in the wilderness?",o:["30","35","40","50"],a:"40"},
+{q:"Which disciple walked on water with Jesus?",o:["John","James","Peter","Andrew"],a:"Peter"},
+{q:"Which miracle did Jesus perform at Cana?",o:["Healing","Feeding","Water into wine","Raising the dead"],a:"Water into wine"},
+{q:"How many baskets were left after feeding the 5,000?",o:["7","10","12","14"],a:"12"},
+{q:"First king of Israel?",o:["Saul","David","Solomon"],a:"Saul"}
+].sort(()=>Math.random()-0.5);
+
+
+
+
+
+let qi=0,score=0,timeLeft=15,timer=null,started=false;
+
+function startTimer(){
+ clearInterval(timer);
+ timeLeft=15;
+ $("timer").innerText=`⏱ ${timeLeft}s`;
+ timer=setInterval(()=>{
+  timeLeft--;
+  $("timer").innerText=`⏱ ${timeLeft}s`;
+  if(timeLeft<=0){
+   clearInterval(timer);
+   wrongSound.play();
+   $("qScore").innerText=`❌ Time up! Correct: ${quiz[qi].a}`;
+   setTimeout(nextQ,1500);
+  }
+ },1000);
+}
+
+function renderQuiz(){
+ if(qi>=quiz.length){
+  $("qText").innerText="🎉 Quiz Finished!";
+  $("qOptions").innerHTML="";
+  $("timer").innerText="";
+  $("qScore").innerText=`Score: ${score}/${quiz.length}`;
+  $("restartBtn").style.display="inline-block";
+  return;
+ }
+ $("qText").innerText=quiz[qi].q;
+ $("qOptions").innerHTML=quiz[qi].o.map(o=>`
+  <label class="qOption">
+    <input type="radio" name="q" value="${o}"> ${o}
+  </label>`).join("");
+ $("qScore").innerText="";
+ $("timer").innerText="⏱ Click Start / Next to begin";
+}
+
+function nextQ(){qi++;started=false;renderQuiz();}
+
+$("qNext").addEventListener("pointerup",()=>{
+ unlockAudio();
+ if(!started){
+  started=true;
+  startTimer();
+  $("qNext").innerText="Next";
+  return;
+ }
+ const sel=document.querySelector('input[name="q"]:checked');
+ if(!sel) return;
+
+ clearInterval(timer);
+ document.querySelectorAll(".qOption").forEach(l=>{
+  const v=l.querySelector("input").value;
+  if(v===quiz[qi].a) l.classList.add("correct");
+  if(l.querySelector("input").checked && v!==quiz[qi].a) l.classList.add("wrong");
+ });
+
+ if(sel.value===quiz[qi].a){
+  score++;correctSound.play();
+  $("qScore").innerText="✅ Correct!";
+ }else{
+  wrongSound.play();
+  $("qScore").innerText=`❌ Wrong! Correct: ${quiz[qi].a}`;
+ }
+
+ setTimeout(nextQ,1500);
+});
+
+$("restartBtn").addEventListener("pointerup",()=>{
+ qi=0;score=0;
+ quiz.sort(()=>Math.random()-0.5);
+ $("restartBtn").style.display="none";
+ renderQuiz();
+});
+
+renderQuiz();
+</script>
+
+
+
+
+
+
+<script>
+/* ===== LANGUAGE DATA ===== */
+const LANG = {
+  en: {
+    title: "📖 Holy Bible Reader & Quiz",
+    readBtn: "Read",
+    nextBtn: "Next",
+    restartBtn: "Restart",
+    timerHint: "⏱ Click Start / Next to begin",
+    correct: "✅ Correct!",
+    wrong: "❌ Wrong! Correct answer:"
+  },
+  fr: {
+    title: "📖 Lecteur Biblique & Quiz",
+    readBtn: "Lire",
+    nextBtn: "Suivant",
+    restartBtn: "Redémarrer",
+    timerHint: "⏱ Cliquez sur Suivant",
+    correct: "✅ Correct !",
+    wrong: "❌ Faux ! Réponse :"
+  },
+  yo: {
+    title: "📖 Ìkànsí Bíbélì & Ìdánwò",
+    readBtn: "Ka (YO)",
+    nextBtn: "Itele",
+    restartBtn: "Tun bẹ̀rẹ̀",
+    timerHint: "⏱ Tẹ Itele lati bẹrẹ aago",
+    correct: "✅ O tọ́!",
+    wrong: "❌ O ṣìṣe! Idahun:"
+  }
+};
+
+/* ===== LANGUAGE ENGINE ===== */
+let currentLang = localStorage.lang || "en";
+
+function applyLanguage(){
+  const L = LANG[currentLang];
+  if(!L) return;
+
+  document.getElementById("title").innerText = L.title;
+  document.getElementById("searchBtn").innerText = L.readBtn;
+  document.getElementById("restartBtn").innerText = "🔁 " + L.restartBtn;
+
+  if(!started){
+    document.getElementById("timer").innerText = L.timerHint;
+  }
+}
+
+const langSelect = document.getElementById("langSelect");
+langSelect.value = currentLang;
+
+langSelect.addEventListener("change", ()=>{
+  currentLang = langSelect.value;
+  localStorage.lang = currentLang;
+  applyLanguage();
+});
+
+applyLanguage();
+</script>
+
+</body>
+</html>
